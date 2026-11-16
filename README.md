@@ -1,10 +1,20 @@
+<div align="center">
+
 # Line Following Robot
 
-An Arduino robot that uses a five-sensor infrared array to follow a black line.
+**An Arduino robot that follows a black line with a five-sensor IR array – and searches for the line again when it loses it.**
 
-![Platform](https://img.shields.io/badge/Platform-Arduino-00979D?logo=arduino&logoColor=white)
-![Language](https://img.shields.io/badge/Language-C%2B%2B-00599C?logo=cplusplus&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Arduino](https://img.shields.io/badge/Arduino-Uno%20%2F%20Nano-00979D?style=for-the-badge&logo=arduino&logoColor=white)
+![C++](https://img.shields.io/badge/C%2B%2B-Arduino-00599C?style=for-the-badge&logo=cplusplus&logoColor=white)
+![Sensors](https://img.shields.io/badge/Sensors-5%C3%97%20IR-E74C3C?style=for-the-badge)
+![Driver](https://img.shields.io/badge/Driver-L298N-34495E?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
+
+[Features](#features) · [Hardware](#hardware) · [Getting Started](#getting-started)
+
+</div>
+
+---
 
 ## Overview
 
@@ -15,8 +25,9 @@ This is an Arduino and infrared-sensor based robot that follows a black line. Fi
 - Five analog IR sensors for line detection
 - Adjustable black/white threshold (default `500`)
 - Differential drive with PWM speed control via the motor driver enable pins
+- Speeds set by two constants: `BASE_SPEED` (default `150`) and `TURN_SPEED` (default `120`)
 - Movement modes: forward, turn left, turn right, stop
-- Stops the motors when the line is lost
+- **Lost-line recovery:** remembers which side the line was last seen on and keeps turning that way until it finds it again
 - Live sensor states printed to the Serial Monitor (9600 baud)
 
 ## Hardware
@@ -46,41 +57,48 @@ This is an Arduino and infrared-sensor based robot that follows a black line. Fi
 | A4 | IR sensor 5 (far right) |
 | GND | Common ground |
 
+> Remove the ENA / ENB jumpers on the L298N so the Arduino can control the motor speed.
+
 ## How It Works
 
 Each loop reads all five sensors, treats a value below the threshold as black, and chooses a movement:
 
 | Sensor condition | Action |
 |---|---|
-| Only the centre sensor (S3) sees black | Move forward (both motors at PWM 150) |
-| S1 or S2 sees black | Turn left (left motor reverse at 120, right forward at 150) |
-| S4 or S5 sees black | Turn right (left forward at 150, right reverse at 120) |
-| Anything else | Stop |
+| Only the centre sensor (S3) sees black | Move forward (both motors at `BASE_SPEED`) |
+| S1 or S2 sees black | Turn left (left motor reverse at `TURN_SPEED`, right forward at `BASE_SPEED`) |
+| S4 or S5 sees black | Turn right (left forward at `BASE_SPEED`, right reverse at `TURN_SPEED`) |
+| No sensor sees black (line lost) | Keep turning towards the side the line was last seen on; stop if it was last seen in the centre |
 
 ```mermaid
 flowchart TD
     A[Read 5 IR sensors] --> B{Only S3 black?}
-    B -- yes --> F[Forward]
+    B -- yes --> F[Forward, last = centre]
     B -- no --> C{S1 or S2 black?}
-    C -- yes --> L[Turn left]
+    C -- yes --> L[Turn left, last = left]
     C -- no --> D{S4 or S5 black?}
-    D -- yes --> R[Turn right]
-    D -- no --> S[Stop]
+    D -- yes --> R[Turn right, last = right]
+    D -- no --> E{Last seen side}
+    E -- left --> L2[Turn left]
+    E -- right --> R2[Turn right]
+    E -- centre --> S[Stop]
 ```
 
 ## Getting Started
 
 1. Install the [Arduino IDE](https://www.arduino.cc/en/software). No extra libraries are needed.
-2. Open `line_following_robot.ino`. The Arduino IDE expects a sketch to be inside a folder of the same name, so it may offer to create a `line_following_robot` folder for it.
+2. Open `line_following_robot/line_following_robot.ino`.
 3. Select your board under **Tools → Board** and the correct **Port**, then click **Upload**.
 4. Place the robot on the track and open the Serial Monitor at **9600 baud** to check the sensor readings (`1` = black).
 5. If the robot does not detect the line reliably, adjust `threshold` in the sketch to suit your sensors and surface.
+6. Tune `BASE_SPEED` and `TURN_SPEED` for your motors and track – lower speeds follow sharp curves more reliably.
 
 ## Project Structure
 
 ```
 line-following/
-├── line_following_robot.ino   # Line follower sketch
+├── line_following_robot/
+│   └── line_following_robot.ino   # Line follower sketch
 ├── LICENSE
 └── README.md
 ```
@@ -88,7 +106,6 @@ line-following/
 ## Future Improvements
 
 - Replace the rule-based steering with a PID controller using a weighted sensor position
-- Add a search behaviour to find the line again instead of stopping
 - Add an automatic sensor calibration routine at startup
 - Handle junctions and sharp turns (e.g. all sensors black)
 

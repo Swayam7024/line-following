@@ -1,3 +1,19 @@
+/*
+ * ------------------------------------------------------------------
+ *  Line Following Robot - 5 IR sensors + dual H-bridge (L298N)
+ * ------------------------------------------------------------------
+ *  Board  : Arduino Uno / Nano (ATmega328P)
+ *  Wiring : D9  -> ENA (left motor speed, PWM)
+ *           D10 -> ENB (right motor speed, PWM)
+ *           D7, D8 -> IN1, IN2 (left motor direction)
+ *           D5, D6 -> IN3, IN4 (right motor direction)
+ *           A0..A4 -> IR sensors S1 (far left) .. S5 (far right)
+ *           GND -> common ground
+ *  Author : Swayam Khantwal (github.com/Swayam7024)
+ *  License: MIT
+ * ------------------------------------------------------------------
+ */
+
 // Motor Pins
 #define ENA 9
 #define ENB 10
@@ -13,8 +29,16 @@
 #define S4 A3
 #define S5 A4
 
+// Motor speeds (PWM 0-255)
+const int BASE_SPEED = 150;   // forward speed, and the outer wheel in a turn
+const int TURN_SPEED = 120;   // inner wheel (reversing) speed in a turn
+
 // Threshold for black/white detection
 int threshold = 500; // You might need to calibrate this
+
+// Which side the line was last seen on (used to find it again)
+enum LineSide { SIDE_CENTER, SIDE_LEFT, SIDE_RIGHT };
+LineSide lastSeen = SIDE_CENTER;
 
 void setup() {
   // Motor setup
@@ -60,19 +84,28 @@ void loop() {
   // Movement logic
   if (s3Black && !s1Black && !s2Black && !s4Black && !s5Black) {
     // Centered - go straight
+    lastSeen = SIDE_CENTER;
     moveForward();
   }
   else if (s2Black || s1Black) {
     // Turn left
+    lastSeen = SIDE_LEFT;
     turnLeft();
   }
   else if (s4Black || s5Black) {
     // Turn right
+    lastSeen = SIDE_RIGHT;
     turnRight();
   }
   else {
-    // Lost - stop or search
-    stopMotors();
+    // Lost - keep turning towards the side where the line was last seen
+    if (lastSeen == SIDE_LEFT) {
+      turnLeft();
+    } else if (lastSeen == SIDE_RIGHT) {
+      turnRight();
+    } else {
+      stopMotors();
+    }
   }
 
   delay(10);
@@ -84,8 +117,8 @@ void moveForward() {
   digitalWrite(IN2, LOW);
   digitalWrite(IN3, HIGH);
   digitalWrite(IN4, LOW);
-  analogWrite(ENA, 150);
-  analogWrite(ENB, 150);
+  analogWrite(ENA, BASE_SPEED);
+  analogWrite(ENB, BASE_SPEED);
 }
 
 void turnLeft() {
@@ -93,8 +126,8 @@ void turnLeft() {
   digitalWrite(IN2, HIGH); // Left motor backward
   digitalWrite(IN3, HIGH);
   digitalWrite(IN4, LOW);  // Right motor forward
-  analogWrite(ENA, 120);
-  analogWrite(ENB, 150);
+  analogWrite(ENA, TURN_SPEED);
+  analogWrite(ENB, BASE_SPEED);
 }
 
 void turnRight() {
@@ -102,8 +135,8 @@ void turnRight() {
   digitalWrite(IN2, LOW);  // Left motor forward
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, HIGH); // Right motor backward
-  analogWrite(ENA, 150);
-  analogWrite(ENB, 120);
+  analogWrite(ENA, BASE_SPEED);
+  analogWrite(ENB, TURN_SPEED);
 }
 
 void stopMotors() {
@@ -111,4 +144,6 @@ void stopMotors() {
   digitalWrite(IN2, LOW);
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, LOW);
+  analogWrite(ENA, 0);
+  analogWrite(ENB, 0);
 }
